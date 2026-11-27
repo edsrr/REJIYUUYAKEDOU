@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>夕やけ堂 レジスター</title>
+<!-- フォールバック用 QuaggaJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  /* --- 画面表示用スタイル --- */
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    margin: 0;
+    padding: 5px;
+    background-color: #f7ede2; 
+    color: #4a3728; 
+    font-size: 14px;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 4px 0;
+    text-align: center;
+    color: #8c2f1b; 
+    border-bottom: 2px dashed #8c2f1b;
+    padding-bottom: 3px;
+  }
+  .container {
+    display: flex;
+    max-width: 840px;
+    margin: 0 auto;
+    gap: 8px;
+  }
+  .left-panel { flex: 1.3; }
+  .right-panel {
+    flex: 1;
+    background-color: #fffaf0;
+    border: 2px dashed #8c2f1b;
+    padding: 8px;
+    border-radius: 4px;
+  }
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+  .btn-item {
+    background-color: #fbd6a6; 
+    border: 1px solid #d4a373;
+    border-radius: 4px;
+    padding: 10px 2px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #5c3d2e;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-item:active { background-color: #e29578; }
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .btn-key {
+    background-color: #f4f1de;
+    border: 1px solid #cbd5e1;
+    color: #5c3d2e;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .btn-key:active { background-color: #e0dcc5; }
+  .btn-action {
+    background-color: #f28482;
+    border-color: #f28482;
+    color: #fff;
+  }
+  .btn-action:active { background-color: #e56b6f; }
+  
+  .receipt-box {
+    background: #fffff6;
+    border: 1px solid #d4a373;
+    padding: 6px;
+    min-height: 200px;
+    max-height: 310px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    color: #333;
+  }
+
+  .scanner-panel {
+    margin-top: 8px;
+    background: #e0f2fe;
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #7dd3fc;
+    display: flex;
+    gap: 5px;
+  }
+  
+  .scanner-wrapper {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    background: #000;
+    margin-top: 5px;
+    display: none;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #webcam-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #interactive.viewport {
+    width: 100%;
+    height: 100%;
+  }
+  #interactive.viewport video, #interactive.viewport canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .master-panel {
+    margin-top: 10px;
+    background: #fdf0d5;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #d4a373;
+  }
+  .master-title {
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #6f1d1b;
+  }
+  .master-inputs input {
+    font-size: 12px;
+    padding: 4px;
+    width: 28%;
+    margin-right: 3px;
+    border: 1px solid #d4a373;
+    border-radius: 3px;
+  }
+  .btn-sub {
+    font-size: 11px;
+    padding: 6px 10px;
+    background-color: #d4a373;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .master-list {
+    margin-top: 5px;
+    font-size: 11px;
+    max-height: 80px;
+    overflow-y: auto;
+    background: #fff;
+    padding: 4px;
+    border: 1px solid #d4a373;
+  }
+  .master-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+    border-bottom: 1px dotted #ccc;
+  }
+  .btn-del {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  /* --- A4印刷専用 スタイル --- */
+  #print-area { display: none; }
+
+  @media print {
+    @page { size: A4 portrait; margin: 5mm; }
+    html, body { height: 100%; margin: 0 !important; padding: 0 !important; overflow: hidden; }
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; display: block !important; }
+    #print-area { position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; color: #000; font-family: "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; }
+    .a4-receipt { border: 1.5px solid #333; padding: 8px; width: 100%; max-width: 198mm; max-height: 285mm; margin: 0 auto; box-sizing: border-box; background: #fff; display: flex !important; flex-direction: column; justify-content: space-between; }
+    .a4-header-group { margin-bottom: 4px; }
+    .a4-title { text-align: center; font-size: 16px; font-weight: bold; border-bottom: 1.5px double #333; padding-bottom: 2px; margin-bottom: 4px; }
+    .a4-info { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; }
+    .table-container { width: 100%; }
+    .table-container.multi-column { column-count: 2; column-gap: 8px; }
+    .a4-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; table-layout: fixed; break-inside: avoid; }
+    .a4-table th, .a4-table td { border: 1px solid #333; padding: 1px 3px; text-align: left; font-size: 9px; line-height: 1.1; }
+    .a4-table th { background-color: #eee; font-weight: bold; }
+    .a4-totals { float: right; width: 180px; font-size: 11px; margin-top: 2px; }
+    .a4-row { display: flex; justify-content: space-between; margin-bottom: 1px; }
+    .a4-grand-total { font-size: 13px; font-weight: bold; border-top: 1.5px solid #333; border-bottom: 1.5px solid #333; padding: 2px 0; }
+    .a4-footer { clear: both; text-align: center; padding-top: 4px; font-size: 9px; border-top: 1px dashed #666; color: #333; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🪀 駄菓子屋「夕やけ堂」のレジ</h1>
+
+<div class="container">
+  <div class="left-panel">
+    <div class="items-grid" id="items-grid"></div>
+    
+    <div class="keypad">
+      <button class="btn-key" onclick="pressNum(7)">7</button>
+      <button class="btn-key" onclick="pressNum(8)">8</button>
+      <button class="btn-key" onclick="pressNum(9)">9</button>
+      <button class="btn-key" onclick="pressNum(4)">4</button>
+      <button class="btn-key" onclick="pressNum(5)">5</button>
+      <button class="btn-key" onclick="pressNum(6)">6</button>
+      <button class="btn-key" onclick="pressNum(1)">1</button>
+      <button class="btn-key" onclick="pressNum(2)">2</button>
+      <button class="btn-key" onclick="pressNum(3)">3</button>
+      <button class="btn-key btn-action" onclick="clearCart()">とりけし (Del/K)</button>
+      <button class="btn-key" onclick="pressNum(0)">0</button>
+      <button class="btn-key btn-action" style="background-color: #d4a373; border-color: #c29262;" onclick="calcTotal()">会計 (G/Enter)</button>
+    </div>
+
+    <div class="scanner-panel">
+      <button class="btn-sub" style="background:#0284c7; flex:1;" onclick="toggleScanner()">📷 バーコードカメラ</button>
+      <button class="btn-sub" style="background:#10b981; flex:1;" onclick="reprintReceipt()">🧾 領収証を発行</button>
+    </div>
+    <div id="scanner-wrapper" class="scanner-wrapper">
+      <video id="webcam-video" playsinline></video>
+      <div id="interactive" class="viewport"></div>
+    </div>
+  </div>
+  
+  <div class="right-panel">
+    <div style="font-weight: bold; margin-bottom: 4px; color: #5c3d2e;">だしたお金: <span id="input-cash" style="color:#d94e34; font-size:18px;">0</span> 円</div>
+    <div class="receipt-box" id="receipt">いらっしゃい！<br>ほしい駄菓子をタップしてね。</div>
+  </div>
+</div>
+
+<div class="master-panel">
+  <div class="master-title">👵 新しいお菓子を仕入れる（商品登録）</div>
+  <div class="master-inputs">
+    <input type="text" id="new-name" placeholder="お菓子のなまえ">
+    <input type="number" id="new-price" placeholder="値段 (円)">
+    <input type="text" id="new-code" placeholder="JANコード (空欄で自動生成)">
+    <button class="btn-sub" onclick="addItem()">お菓子を追加</button>
+  </div>
+  <div class="master-list" id="master-list"></div>
+</div>
+
+<!-- A4印刷用エリア -->
+<div id="print-area">
+  <div class="a4-receipt">
+    <div>
+      <div class="a4-header-group">
+        <div class="a4-title">領 収 証</div>
+        <div class="a4-info">
+          <div>発行元: 駄菓子 夕やけ堂</div>
+          <div>日付: <span id="print-date"></span></div>
+        </div>
+      </div>
+
+      <div id="table-container" class="table-container">
+        <table class="a4-table">
+          <thead>
+            <tr>
+              <th style="width: 45%;">品名</th>
+              <th style="width: 20%;">単価</th>
+              <th style="width: 15%;">数量</th>
+              <th style="width: 20%;">金額</th>
+            </tr>
+          </thead>
+          <tbody id="print-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div class="a4-totals">
+        <div class="a4-row a4-grand-total">
+          <span>合計金額:</span>
+          <span id="print-total">0円</span>
+        </div>
+        <div class="a4-row">
+          <span>お預り金額:</span>
+          <span id="print-cash">0円</span>
+        </div>
+        <div class="a4-row">
+          <span>お釣り:</span>
+          <span id="print-change">0円</span>
+        </div>
+      </div>
+
+      <div class="a4-footer">
+        上記のお買い上げ、誠にありがとうございます。またのごご利用を心よりお待ちしております。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var products = [
+    { name: "30円ヨーグルト", price: 30, code: "4901234000018" },
+    { name: "めんたいコーン", price: 10, code: "4901234000025" },
+    { name: "コーララムネ", price: 30, code: "4901234000032" },
+    { name: "串カツ（1本）", price: 40, code: "4901234000049" },
+    { name: "イカすする板", price: 50, code: "4901234000056" },
+    { name: "きなこ棒", price: 10, code: "4901234000063" },
+    { name: "チョコ駄菓子", price: 30, code: "4901234000070" },
+    { name: "さくら餅さくらんぼ", price: 40, code: "4901234000087" },
+    { name: "ラムネ瓶ジュース", price: 100, code: "4901234000094" }
+  ];
+
+  var cart = [];
+  var currentInputCash = ""; 
+  var errorMessage = "";
+  var scannerActive = false;
+  var lastScannedCode = "";
+  var lastScanTime = 0;
+  var autoCodeIndex = 10;
+  var videoStream = null;
+  var scanInterval = null;
+
+  // 直近の会計データを保持する変数
+  var lastTransaction = null;
+
+  window.onload = function() {
+    renderAll();
+  };
+
+  function generateJan13(itemIndex) {
+    var prefix = "4901234";
+    var itemStr = ("0000" + itemIndex).slice(-5);
+    var base12 = prefix + itemStr;
+    
+    var sumEven = 0;
+    var sumOdd = 0;
+    for (var i = 0; i < 12; i++) {
+      var num = parseInt(base12.charAt(i), 10);
+      if (i % 2 === 1) {
+        sumEven += num;
+      } else {
+        sumOdd += num;
+      }
+    }
+    var total = (sumEven * 3) + sumOdd;
+    var checkDigit = (10 - (total % 10)) % 10;
+
+    return base12 + checkDigit;
+  }
+
+  document.addEventListener('keydown', function(event) {
+    var activeElement = document.activeElement;
+    if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
+      return;
+    }
+
+    var code = event.code;
+    var key = event.key;
+
+    if (code.indexOf('Numpad') === 0 && !isNaN(code.replace('Numpad', ''))) {
+      pressNum(parseInt(code.replace('Numpad', ''), 10));
+    } else if (key >= '0' && key <= '9') {
+      pressNum(parseInt(key, 10));
+    } 
+    else if (key === 'Delete' || key === 'k' || key === 'K') {
+      clearCart();
+    } 
+    else if (key === 'g' || key === 'G' || key === 'Enter' || code === 'NumpadEnter') {
+      calcTotal();
+    } 
+    else if (key === 'Backspace') {
+      if (currentInputCash.length > 0) {
+        currentInputCash = currentInputCash.slice(0, -1);
+        updateReceipt();
+      }
+    }
+  });
+
+  function renderAll() {
+    var gridHtml = "";
+    for (var i = 0; i < products.length; i++) {
+      gridHtml += '<button class="btn-item" onclick="addToCart(' + i + ')">' + 
+                  products[i].name + '<br>' + products[i].price + '円</button>';
+    }
+    document.getElementById("items-grid").innerHTML = gridHtml;
+
+    var listHtml = "";
+    for (var i = 0; i < products.length; i++) {
+      var codeStr = products[i].code ? ' [' + products[i].code + ']' : '';
+      listHtml += '<div class="master-item"><span>' + products[i].name + ' (' + products[i].price + '円)' + codeStr + '</span>' +
+                  '<button class="btn-del" onclick="deleteItem(' + i + ')">やめる</button></div>';
+    }
+    document.getElementById("master-list").innerHTML = listHtml;
+
+    updateReceipt();
+  }
+
+  function addToCart(index) {
+    errorMessage = "";
+    var p = products[index];
+    var found = false;
+    for (var i = 0; i < cart.length; i++) {
+      if (cart[i].name === p.name) {
+        cart[i].qty++;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      cart.push({ name: p.name, price: p.price, qty: 1 });
+    }
+    updateReceipt();
+  }
+
+  function addToCartByCode(code) {
+    for (var i = 0; i < products.length; i++) {
+      if (products[i].code === code) {
+        addToCart(i);
+        return true;
+      }
+    }
+    errorMessage = "未登録のJAN: " + code;
+    updateReceipt();
+    return false;
+  }
+
+  function updateReceipt() {
+    var receiptBox = document.getElementById("receipt");
+    var total = 0;
+    var receiptText = "=== 駄菓子 夕やけ堂 ===\n\n";
+    
+    if (cart.length === 0) {
+      receiptText += "  いらっしゃい！\n  なにか買うかい？\n";
+    } else {
+      for (var i = 0; i < cart.length; i++) {
+        var subTotal = cart[i].price * cart[i].qty;
+        total += subTotal;
+        receiptText += cart[i].name + " x " + cart[i].qty + "\n";
+        receiptText += "               " + subTotal + "円\n";
+      }
+    }
+    
+    receiptText += "---------------------\n";
+    receiptText += "お会計:        " + total + "円\n";
+    receiptText += "---------------------\n";
+
+    if (errorMessage) {
+      receiptText += "\n⚠️ " + errorMessage + "\n";
+      receiptText += "---------------------\n";
+    }
+
+    receiptBox.innerText = receiptText;
+    document.getElementById("input-cash").innerText = currentInputCash || "0";
+    return total;
+  }
+
+  function pressNum(num) {
+    errorMessage = "";
+    currentInputCash += num.toString();
+    updateReceipt();
+  }
+
+  function clearCart() {
+    errorMessage = "";
+    cart = [];
+    currentInputCash = "";
+    updateReceipt();
+  }
+
+  function calcTotal() {
+    var grandTotal = updateReceipt();
+    var cash = parseInt(currentInputCash, 10) || 0;
+
+    if (cart.length === 0) {
+      errorMessage = "お菓子が選ばれていないよ！";
+      updateReceipt();
+      return;
+    }
+
+    if (cash < grandTotal) {
+      errorMessage = "お金が足りないよ！\nおじいちゃん困っちゃうな。";
+      updateReceipt();
+      return;
+    }
+
+    var change = cash - grandTotal;
+    
+    var receiptText = document.getElementById("receipt").innerText;
+    receiptText += "だしたお金:    " + cash + "円\n";
+    receiptText += "おつり:        " + change + "円\n";
+    receiptText += "=====================\n";
+    receiptText += "  またおいで！気をつけて帰るんだよ。\n";
+    document.getElementById("receipt").innerText = receiptText;
+
+    var now = new Date();
+    var dateStr = now.getFullYear() + "年" + (now.getMonth() + 1) + "月" + now.getDate() + "日 " + now.getHours() + ":" + ("0" + now.getMinutes()).slice(-2);
+
+    // 直近の会計データを保存
+    lastTransaction = {
+      cart: JSON.parse(JSON.stringify(cart)),
+      total: grandTotal,
+      cash: cash,
+      change: change,
+      date: dateStr
+    };
+
+    executePrint(lastTransaction);
+
+    cart = [];
+    currentInputCash = "";
+  }
+
+  function reprintReceipt() {
+    if (!lastTransaction) {
+      alert("まだ直近のレシートデータがありません。");
+      return;
+    }
+    executePrint(lastTransaction);
+  }
+
+  function executePrint(tx) {
+    document.getElementById("print-date").innerText = tx.date;
+    
+    var containerElem = document.getElementById("table-container");
+    if (tx.cart.length > 15) {
+      containerElem.classList.add("multi-column");
+    } else {
+      containerElem.classList.remove("multi-column");
+    }
+
+    var tbodyHtml = "";
+    for (var i = 0; i < tx.cart.length; i++) {
+      var sub = tx.cart[i].price * tx.cart[i].qty;
+      tbodyHtml += '<tr>' +
+                   '<td>' + tx.cart[i].name + '</td>' +
+                   '<td>' + tx.cart[i].price + '円</td>' +
+                   '<td>' + tx.cart[i].qty + '</td>' +
+                   '<td>' + sub + '円</td>' +
+                   '</tr>';
+    }
+    document.getElementById("print-tbody").innerHTML = tbodyHtml;
+    document.getElementById("print-total").innerText = tx.total + "円";
+    document.getElementById("print-cash").innerText = tx.cash + "円";
+    document.getElementById("print-change").innerText = tx.change + "円";
+
+    setTimeout(function() {
+      window.print();
+    }, 200);
+  }
+
+  function addItem() {
+    var nameInput = document.getElementById("new-name");
+    var priceInput = document.getElementById("new-price");
+    var codeInput = document.getElementById("new-code");
+    var name = nameInput.value.trim();
+    var price = parseInt(priceInput.value, 10);
+    var code = codeInput.value.trim();
+
+    if (!name || isNaN(price)) {
+      errorMessage = "お菓子のなまえと値段を入れてね";
+      updateReceipt();
+      return;
+    }
+
+    if (!code) {
+      code = generateJan13(autoCodeIndex);
+      autoCodeIndex++;
+    }
+
+    var exists = false;
+    for (var i = 0; i < products.length; i++) {
+      if (products[i].name === name) {
+        products[i].price = price;
+        products[i].code = code;
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      products.push({ name: name, price: price, code: code });
+    }
+
+    nameInput.value = "";
+    priceInput.value = "";
+    codeInput.value = "";
+    renderAll();
+  }
+
+  function deleteItem(index) {
+    products.splice(index, 1);
+    renderAll();
+  }
+
+  /* --- カメラ制御 --- */
+  function toggleScanner() {
+    var wrapper = document.getElementById("scanner-wrapper");
+    var video = document.getElementById("webcam-video");
+    var quaggaElem = document.getElementById("interactive");
+
+    if (scannerActive) {
+      stopScanner();
+      return;
+    }
+
+    wrapper.style.display = "block";
+
+    if ('BarcodeDetector' in window) {
+      video.style.display = "block";
+      quaggaElem.style.display = "none";
+
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+      }).then(function(stream) {
+        videoStream = stream;
+        video.srcObject = stream;
+        video.play();
+        scannerActive = true;
+
+        var barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8'] });
+
+        scanInterval = setInterval(function() {
+          if (!scannerActive) return;
+          barcodeDetector.detect(video).then(function(barcodes) {
+            if (barcodes.length > 0) {
+              handleScannedCode(barcodes[0].rawValue);
+            }
+          }).catch(function(){});
+        }, 300);
+
+      }).catch(function(err) {
+        errorMessage = "カメラ起動エラー: HTTPS接続または許可を確認してください";
+        updateReceipt();
+        wrapper.style.display = "none";
+      });
+    } else {
+      video.style.display = "none";
+      quaggaElem.style.display = "block";
+
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: quaggaElem,
+          constraints: { facingMode: "environment" }
+        },
+        decoder: { readers: ["ean_reader", "ean_8_reader"] }
+      }, function(err) {
+        if (err) {
+          errorMessage = "カメラ起動エラー: HTTPS接続または許可を確認してください";
+          updateReceipt();
+          wrapper.style.display = "none";
+          return;
+        }
+        Quagga.start();
+        scannerActive = true;
+      });
+
+      Quagga.onDetected(function(result) {
+        if (result && result.codeResult && result.codeResult.code) {
+          handleScannedCode(result.codeResult.code);
+        }
+      });
+    }
+  }
+
+  function stopScanner() {
+    var wrapper = document.getElementById("scanner-wrapper");
+    scannerActive = false;
+
+    if (scanInterval) {
+      clearInterval(scanInterval);
+      scanInterval = null;
+    }
+
+    if (videoStream) {
+      videoStream.getTracks().forEach(function(track) { track.stop(); });
+      videoStream = null;
+    }
+
+    if (typeof Quagga !== 'undefined') {
+      Quagga.stop();
+    }
+
+    wrapper.style.display = "none";
+  }
+
+  function handleScannedCode(scannedCode) {
+    var now = new Date().getTime();
+    if (scannedCode === lastScannedCode && (now - lastScanTime) < 1500) {
+      return;
+    }
+    lastScannedCode = scannedCode;
+    lastScanTime = now;
+
+    addToCartByCode(scannedCode);
+  }
+
+  renderAll();
+</script>
+
+</body>
+</html>
